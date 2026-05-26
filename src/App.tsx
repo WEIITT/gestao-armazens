@@ -741,7 +741,37 @@ function ProductsView({
   const [name, setName] = useState("");
   const [unit, setUnit] = useState("un");
   const [reorderLevel, setReorderLevel] = useState(10);
+  const [scannerOpen, setScannerOpen] = useState(false);
+  const [scannerStatus, setScannerStatus] = useState("");
   const [editing, setEditing] = useState<Product | null>(null);
+  const [search, setSearch] = useState("");
+
+  useEffect(() => {
+    if (!scannerOpen) return;
+
+    const scanner = new Html5QrcodeScanner(
+      "product-qr-reader",
+      {
+        fps: 10,
+        qrbox: 250,
+      },
+      false
+    );
+
+    scanner.render(
+      (decodedText: string) => {
+        setSku(decodedText);
+        setScannerStatus(`Código lido: ${decodedText}`);
+        scanner.clear();
+        setScannerOpen(false);
+      },
+      () => {}
+    );
+
+    return () => {
+      scanner.clear().catch(() => {});
+    };
+  }, [scannerOpen]);
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -759,11 +789,22 @@ function ProductsView({
     setName("");
     setUnit("un");
     setReorderLevel(10);
+    setScannerStatus("");
+    setScannerOpen(false);
   };
 
-    const refsFor = (productId: string) =>
-      Object.entries(stock).filter(([k, q]) => k.endsWith(`:${productId}`) && q > 0)
-        .length;
+  const refsFor = (productId: string) =>
+    Object.entries(stock).filter(([k, q]) => k.endsWith(`:${productId}`) && q > 0)
+      .length;
+
+  const filteredProducts = products.filter((p) => {
+    const term = search.trim().toLowerCase();
+    return (
+      p.name.toLowerCase().includes(term) ||
+      p.sku.toLowerCase().includes(term) ||
+      p.unit.toLowerCase().includes(term)
+    );
+  });
 
   return (
     <section className="panel fade-in">
@@ -771,14 +812,33 @@ function ProductsView({
         <form className="card form-card" onSubmit={submit}>
           <h2>{editing ? "Editar produto" : "Novo produto"}</h2>
           <label className="field">
-            <span>SKU</span>
+            <span>SKU / Código de barras</span>
             <input
               value={sku}
               onChange={(e) => setSku(e.target.value)}
-              placeholder="Ex.: SKU-100"
+              placeholder="Ler código de barras ou inserir SKU"
               required
             />
           </label>
+
+          <div className="row wrap">
+            <button
+              type="button"
+              className="btn ghost small"
+              onClick={() => setScannerOpen(true)}
+            >
+              Ler código de barras / QR Code
+            </button>
+
+            {scannerStatus ? (
+              <span className="muted small">{scannerStatus}</span>
+            ) : null}
+          </div>
+
+          {scannerOpen ? (
+            <div id="product-qr-reader" className="qr-reader" />
+          ) : null}
+
           <label className="field">
             <span>Nome</span>
             <input
@@ -822,6 +882,8 @@ function ProductsView({
                   setName("");
                   setUnit("un");
                   setReorderLevel(10);
+                  setScannerStatus("");
+                  setScannerOpen(false);
                 }}
               >
                 Cancelar
@@ -830,78 +892,78 @@ function ProductsView({
           </div>
         </form>
 
-          <div className="card">
-            <div className="card-head">
-              <h2>Lista</h2>
-            </div>
-            <label className="field">
-              <span>Pesquisa rápida</span>
-              <input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Pesquisar por nome, SKU ou unidade"
-              />
-            </label>
-            <div className="table-wrap">
-              <table className="table">
-                <thead>
+        <div className="card">
+          <div className="card-head">
+            <h2>Lista</h2>
+          </div>
+          <label className="field">
+            <span>Pesquisa rápida</span>
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Pesquisar por nome, SKU ou unidade"
+            />
+          </label>
+          <div className="table-wrap">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>SKU</th>
+                  <th>Nome</th>
+                  <th>Un.</th>
+                  <th className="num">Mín.</th>
+                  <th className="num">Refs</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {filteredProducts.length === 0 ? (
                   <tr>
-                    <th>SKU</th>
-                    <th>Nome</th>
-                    <th>Un.</th>
-                    <th className="num">Mín.</th>
-                    <th className="num">Refs</th>
-                    <th />
+                    <td colSpan={6} className="muted pad">
+                      Sem produtos. Registe SKUs para movimentar stock.
+                    </td>
                   </tr>
-                </thead>
-                <tbody>
-                  {filteredProducts.length === 0 ? (
-                    <tr>
-                      <td colSpan={6} className="muted pad">
-                        Sem produtos. Registe SKUs para movimentar stock.
+                ) : (
+                  filteredProducts.map((p) => (
+                    <tr key={p.id}>
+                      <td className="mono">{p.sku}</td>
+                      <td className="strong">{p.name}</td>
+                      <td>{p.unit}</td>
+                      <td className="num">{p.reorderLevel}</td>
+                      <td className="num">{refsFor(p.id)}</td>
+                      <td className="actions">
+                        <button
+                          type="button"
+                          className="btn ghost small"
+                          onClick={() => {
+                            setEditing(p);
+                            setSku(p.sku);
+                            setName(p.name);
+                            setUnit(p.unit);
+                            setReorderLevel(p.reorderLevel);
+                          }}
+                        >
+                          Editar
+                        </button>
+                        <button
+                          type="button"
+                          className="btn danger ghost small"
+                          onClick={() => onDelete(p.id)}
+                        >
+                          Remover
+                        </button>
                       </td>
                     </tr>
-                  ) : (
-                    filteredProducts.map((p) => (
-                      <tr key={p.id}>
-                        <td className="mono">{p.sku}</td>
-                        <td className="strong">{p.name}</td>
-                        <td>{p.unit}</td>
-                        <td className="num">{p.reorderLevel}</td>
-                        <td className="num">{refsFor(p.id)}</td>
-                        <td className="actions">
-                          <button
-                            type="button"
-                            className="btn ghost small"
-                            onClick={() => {
-                              setEditing(p);
-                              setSku(p.sku);
-                              setName(p.name);
-                              setUnit(p.unit);
-                              setReorderLevel(p.reorderLevel);
-                            }}
-                          >
-                            Editar
-                          </button>
-                          <button
-                            type="button"
-                            className="btn danger ghost small"
-                            onClick={() => onDelete(p.id)}
-                          >
-                            Remover
-                          </button>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
+                  ))
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
-      </section>
-    );
-  }
+      </div>
+    </section>
+  );
+}
 
   function StockView({
     warehouses,
