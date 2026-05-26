@@ -724,171 +724,111 @@
     );
   }
 
-  function ProductsView({
-    products,
-    stock,
-    onAdd,
-    onUpdate,
-    onDelete,
-  }: {
-    products: Product[];
-    stock: Record<string, number>;
-    onAdd: (p: Omit<Product, "id">) => void;
-    onUpdate: (p: Product) => void;
-    onDelete: (id: string) => void;
-  }) {
-    const [sku, setSku] = useState("");
-    const [name, setName] = useState("");
-    const [unit, setUnit] = useState("un");
-    const [reorderLevel, setReorderLevel] = useState(10);
-    const [scannerOpen, setScannerOpen] = useState(false);
-    const [scannerStatus, setScannerStatus] = useState("");
-    const [editing, setEditing] = useState<Product | null>(null);
-    const [search, setSearch] = useState("");
+function ProductsView({
+  products,
+  stock,
+  onAdd,
+  onUpdate,
+  onDelete,
+}: {
+  products: Product[];
+  stock: Record<string, number>;
+  onAdd: (p: Omit<Product, "id">) => void;
+  onUpdate: (p: Product) => void;
+  onDelete: (id: string) => void;
+}) {
+  const [sku, setSku] = useState("");
+  const [name, setName] = useState("");
+  const [unit, setUnit] = useState("un");
+  const [reorderLevel, setReorderLevel] = useState(10);
+  const [editing, setEditing] = useState<Product | null>(null);
 
-    useEffect(() => {
-      if (!scannerOpen) return;
-
-      const scanner = new Html5QrcodeScanner(
-        "product-qr-reader",
-        {
-          fps: 10,
-          qrbox: 250,
-        },
-        false
-      );
-
-      scanner.render(
-      (decodedText: string) => {
-          setScannerStatus(`Código lido: ${decodedText}`);
-          scanner.clear();
-          setScannerOpen(false);
-        },
-        () => {}
-      );
-
-      return () => {
-        scanner.clear().catch(() => {});
-      };
-    }, [scannerOpen]);
-
-    const submit = (e: React.FormEvent) => {
-      e.preventDefault();
-      const s = sku.trim();
-      const n = name.trim();
-      if (!s || !n) return;
-      const rl = Math.max(0, Math.floor(Number(reorderLevel)));
-      if (editing) {
-        onUpdate({ ...editing, sku: s, name: n, unit: unit.trim() || "un", reorderLevel: rl });
-        setEditing(null);
-      } else {
-        onAdd({ sku: s, name: n, unit: unit.trim() || "un", reorderLevel: rl });
-      }
-      setSku("");
-      setName("");
-      setUnit("un");
-      setReorderLevel(10);
-      setScannerStatus("");
-      setScannerOpen(false);
-    };
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const s = sku.trim();
+    const n = name.trim();
+    if (!s || !n) return;
+    const rl = Math.max(0, Math.floor(Number(reorderLevel)));
+    if (editing) {
+      onUpdate({ ...editing, sku: s, name: n, unit: unit.trim() || "un", reorderLevel: rl });
+      setEditing(null);
+    } else {
+      onAdd({ sku: s, name: n, unit: unit.trim() || "un", reorderLevel: rl });
+    }
+    setSku("");
+    setName("");
+    setUnit("un");
+    setReorderLevel(10);
+  };
 
     const refsFor = (productId: string) =>
       Object.entries(stock).filter(([k, q]) => k.endsWith(`:${productId}`) && q > 0)
         .length;
 
-    const filteredProducts = products.filter((p) => {
-      const term = search.trim().toLowerCase();
-
-      return (
-        p.name.toLowerCase().includes(term) ||
-        p.sku.toLowerCase().includes(term) ||
-        p.unit.toLowerCase().includes(term)
-      );
-    });
-
-    return (
-      <section className="panel fade-in">
-        <div className="grid-2">
-          <form className="card form-card" onSubmit={submit}>
-            <h2>{editing ? "Editar produto" : "Novo produto"}</h2>
-            <label className="field">
-              <span>SKU / Código de barras</span>
+  return (
+    <section className="panel fade-in">
+      <div className="grid-2">
+        <form className="card form-card" onSubmit={submit}>
+          <h2>{editing ? "Editar produto" : "Novo produto"}</h2>
+          <label className="field">
+            <span>SKU</span>
+            <input
+              value={sku}
+              onChange={(e) => setSku(e.target.value)}
+              placeholder="Ex.: SKU-100"
+              required
+            />
+          </label>
+          <label className="field">
+            <span>Nome</span>
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Descrição curta"
+              required
+            />
+          </label>
+          <div className="row gap">
+            <label className="field grow">
+              <span>Unidade</span>
               <input
-                value={sku}
-                onChange={(e) => setSku(e.target.value)}
-                placeholder="Ler código de barras ou inserir SKU"
-                required
+                value={unit}
+                onChange={(e) => setUnit(e.target.value)}
+                placeholder="un, kg, cx..."
               />
             </label>
-
-            <div className="row wrap">
+            <label className="field grow">
+              <span>Mínimo (alerta)</span>
+              <input
+                type="number"
+                min={0}
+                step={1}
+                value={reorderLevel}
+                onChange={(e) => setReorderLevel(Number(e.target.value))}
+              />
+            </label>
+          </div>
+          <div className="row">
+            <button type="submit" className="btn primary">
+              {editing ? "Guardar" : "Adicionar"}
+            </button>
+            {editing ? (
               <button
                 type="button"
-                className="btn ghost small"
-                onClick={() => setScannerOpen(true)}
+                className="btn ghost"
+                onClick={() => {
+                  setEditing(null);
+                  setSku("");
+                  setName("");
+                  setUnit("un");
+                  setReorderLevel(10);
+                }}
               >
-                Ler código de barras / QR Code
+                Cancelar
               </button>
-
-              {scannerStatus ? (
-                <span className="muted small">{scannerStatus}</span>
-              ) : null}
-            </div>
-
-            {scannerOpen ? (
-              <div id="product-qr-reader" className="qr-reader" />
             ) : null}
-
-            <label className="field">
-              <span>Nome</span>
-              <input
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Descrição curta"
-                required
-              />
-            </label>
-            <div className="row gap">
-              <label className="field grow">
-                <span>Unidade</span>
-                <input
-                  value={unit}
-                  onChange={(e) => setUnit(e.target.value)}
-                  placeholder="un, kg, cx..."
-                />
-              </label>
-              <label className="field grow">
-                <span>Mínimo (alerta)</span>
-                <input
-                  type="number"
-                  min={0}
-                  step={1}
-                  value={reorderLevel}
-                  onChange={(e) => setReorderLevel(Number(e.target.value))}
-                />
-              </label>
-            </div>
-            <div className="row">
-              <button type="submit" className="btn primary">
-                {editing ? "Guardar" : "Adicionar"}
-              </button>
-              {editing ? (
-                <button
-                  type="button"
-                  className="btn ghost"
-                  onClick={() => {
-                    setEditing(null);
-                    setSku("");
-                    setName("");
-                    setUnit("un");
-                    setReorderLevel(10);
-                  }}
-                >
-                  Cancelar
-                </button>
-              ) : null}
-            </div>
-          </form>
+          </div>
+        </form>
 
           <div className="card">
             <div className="card-head">
@@ -1051,60 +991,60 @@
     );
   }
 
-  function MovementsView({
-    movements,
-    warehouses,
-    products,
-    registerMovement,
-  }: {
-    movements: import("./types").Movement[];
-    warehouses: Warehouse[];
-    products: Product[];
-    registerMovement: (p: {
-      kind: MovementKind;
-      productId: string;
-      quantity: number;
-      warehouseId?: string;
-      fromWarehouseId?: string;
-      toWarehouseId?: string;
-      note?: string;
-    }) => void;
-  }) {
-    const [kind, setKind] = useState<MovementKind>("entrada");
-    const [productId, setProductId] = useState("");
-    const [quantity, setQuantity] = useState(1);
-    const [warehouseId, setWarehouseId] = useState("");
-    const [fromId, setFromId] = useState("");
-    const [toId, setToId] = useState("");
-    const [note, setNote] = useState("");
+function MovementsView({
+  movements,
+  warehouses,
+  products,
+  registerMovement,
+}: {
+  movements: import("./types").Movement[];
+  warehouses: Warehouse[];
+  products: Product[];
+  registerMovement: (p: {
+    kind: MovementKind;
+    productId: string;
+    quantity: number;
+    warehouseId?: string;
+    fromWarehouseId?: string;
+    toWarehouseId?: string;
+    note?: string;
+  }) => void;
+}) {
+  const [kind, setKind] = useState<MovementKind>("entrada");
+  const [productId, setProductId] = useState("");
+  const [quantity, setQuantity] = useState(1);
+  const [warehouseId, setWarehouseId] = useState("");
+  const [fromId, setFromId] = useState("");
+  const [toId, setToId] = useState("");
+  const [note, setNote] = useState("");
 
-    const submit = (e: React.FormEvent) => {
-      e.preventDefault();
-      const q = Math.floor(Number(quantity));
-      if (!productId || q <= 0) return;
-      if (kind === "entrada" || kind === "saida" || kind === "ajuste") {
-        if (!warehouseId) return;
-        registerMovement({
-          kind,
-          productId,
-          quantity: q,
-          warehouseId,
-          note: note.trim() || undefined,
-        });
-      } else {
-        if (!fromId || !toId) return;
-        registerMovement({
-          kind: "transferencia",
-          productId,
-          quantity: q,
-          fromWarehouseId: fromId,
-          toWarehouseId: toId,
-          note: note.trim() || undefined,
-        });
-      }
-      setQuantity(1);
-      setNote("");
-    };
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const q = Math.floor(Number(quantity));
+    if (!productId || q <= 0) return;
+    if (kind === "entrada" || kind === "saida" || kind === "ajuste") {
+      if (!warehouseId) return;
+      registerMovement({
+        kind,
+        productId,
+        quantity: q,
+        warehouseId,
+        note: note.trim() || undefined,
+      });
+    } else {
+      if (!fromId || !toId) return;
+      registerMovement({
+        kind: "transferencia",
+        productId,
+        quantity: q,
+        fromWarehouseId: fromId,
+        toWarehouseId: toId,
+        note: note.trim() || undefined,
+      });
+    }
+    setQuantity(1);
+    setNote("");
+  };
 
     const labelMovement = (m: import("./types").Movement) => {
       const prod = products.find((p) => p.id === m.productId);
@@ -1138,19 +1078,19 @@
           <form className="card form-card" onSubmit={submit}>
             <h2>Novo movimento</h2>
 
-            <label className="field">
-              <span>Tipo</span>
-              <select
-                value={kind}
-                onChange={(e) => setKind(e.target.value as MovementKind)}
-              >
-                {(Object.keys(kindLabel) as MovementKind[]).map((k) => (
-                  <option key={k} value={k}>
-                    {kindLabel[k]}
-                  </option>
-                ))}
-              </select>
-            </label>
+          <label className="field">
+            <span>Tipo</span>
+            <select
+              value={kind}
+              onChange={(e) => setKind(e.target.value as MovementKind)}
+            >
+              {(Object.keys(kindLabel) as MovementKind[]).map((k) => (
+                <option key={k} value={k}>
+                  {kindLabel[k]}
+                </option>
+              ))}
+            </select>
+          </label>
 
             <label className="field">
               <span>Produto</span>
